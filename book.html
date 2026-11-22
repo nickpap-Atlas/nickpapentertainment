@@ -1476,14 +1476,8 @@ function submitForm() {
   const songs = collectSongs();
   const eventSpecific = collectEventSpecific();
 
-  // Build a hidden form and POST it — standard form POST works on Formspree free plan
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = 'https://formspree.io/f/mgorbdgz';
-
   const fields = {
     _subject:             `New ${selectedEventType} booking — ${clientName}`,
-    _next:                window.location.origin + window.location.pathname + '?submitted=1',
     event_type:           selectedEventType,
     client_name:          clientName,
     email:                getVal('email'),
@@ -1498,29 +1492,41 @@ function submitForm() {
     spotify_playlist_url: getPlaylistUrl(),
     special_requests:     getSpecialRequests()
   };
+  const data = new FormData();
+  Object.entries(fields).forEach(([k, v]) => data.append(k, v || ''));
 
-  Object.entries(fields).forEach(([name, value]) => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = name;
-    input.value = value || '';
-    form.appendChild(input);
-  });
+  fetch('https://formspree.io/f/mgorbdgz', { method: 'POST', body: data, headers: { Accept: 'application/json' } })
+    .then(r => r.ok ? showBookingSuccess() : r.json().then(j => Promise.reject(j)))
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = 'Try again';
+      alertBookingError();
+    });
+}
 
-  document.body.appendChild(form);
-  form.submit();
+function showBookingSuccess() {
+  document.querySelectorAll('.step-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('progress-bar').style.display = 'none';
+  document.getElementById('success-screen').style.display = 'block';
+  document.getElementById('success-msg').textContent =
+    "Thanks! Nick will be in touch within 24 hours to confirm your booking.";
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function alertBookingError() {
+  let el = document.getElementById('submit-error');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'submit-error';
+    el.style.cssText = 'color:#ff8a8a;font-size:14px;margin-top:12px;text-align:center';
+    document.getElementById('submit-btn').insertAdjacentElement('afterend', el);
+  }
+  el.innerHTML = 'Sorry, that didn\u2019t send. Please try again, or call/text 0449 104 378 or email <a href="mailto:djnickpap@gmail.com" style="color:#C4A052">djnickpap@gmail.com</a>.';
 }
 
 // ─── Show success screen on return from Formspree redirect ─────────────────────
 if (new URLSearchParams(window.location.search).get('submitted') === '1') {
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.step-panel').forEach(p => p.style.display = 'none');
-    document.getElementById('progress-bar').style.display = 'none';
-    document.getElementById('success-screen').style.display = 'block';
-    document.getElementById('success-msg').textContent =
-      `Thanks! We'll be in touch within 24 hours to confirm your booking. Check your inbox for a confirmation email.`;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+  document.addEventListener('DOMContentLoaded', showBookingSuccess);
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
