@@ -538,12 +538,15 @@
     font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold);
   }
   .review-author .g-verified { width: 14px; height: 14px; }
-  .reviews-dots { display: flex; justify-content: center; gap: 10px; margin-top: 36px; }
-  .reviews-dots button {
-    width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0;
-    background: var(--mid); cursor: pointer; transition: all 0.3s ease;
+  .reviews-dots { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 32px; }
+  .reviews-nav-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(196,160,82,0.45);
+    background: transparent; color: var(--gold); font-size: 22px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; transition: all 0.25s ease;
   }
-  .reviews-dots button.active { background: var(--gold); transform: scale(1.3); }
+  .reviews-nav-btn:hover, .reviews-nav-btn:focus-visible { background: rgba(196,160,82,0.12); border-color: var(--gold); outline: none; }
+  .reviews-count { font-size: 11px; letter-spacing: 0.25em; color: var(--text-muted); min-width: 64px; text-align: center; }
+  .reviews-carousel { touch-action: pan-y; }
   .reviews-cta { margin-top: 44px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 
   /* ─── PACKAGES ─── */
@@ -1124,33 +1127,60 @@
     });
 
     const slides = track.querySelectorAll('.review-slide');
-    let dots = [];
+    let cur = 0, timer = null, paused = false, userControlled = false, counter = null;
     if (REVIEWS.length > 1) {
-      REVIEWS.forEach((_, i) => {
-        const d = document.createElement('button');
-        d.className = i === 0 ? 'active' : '';
-        d.setAttribute('aria-label', 'Review ' + (i + 1));
-        d.addEventListener('click', () => go(i));
-        dotsWrap.appendChild(d);
-      });
-      dots = dotsWrap.querySelectorAll('button');
+      dotsWrap.innerHTML =
+        '<button type="button" class="reviews-nav-btn" data-dir="-1" aria-label="Previous review">&#8249;</button>' +
+        '<span class="reviews-count" aria-live="polite"></span>' +
+        '<button type="button" class="reviews-nav-btn" data-dir="1" aria-label="Next review">&#8250;</button>';
+      counter = dotsWrap.querySelector('.reviews-count');
+      dotsWrap.querySelectorAll('.reviews-nav-btn').forEach(b =>
+        b.addEventListener('click', () => { userControlled = true; go(cur + Number(b.dataset.dir)); }));
     }
 
-    let cur = 0, timer;
+    // Longer reviews stay up longer: ~8s minimum, up to 20s
+    function delayFor(i) { return Math.min(20000, Math.max(8000, 4000 + REVIEWS[i].text.length * 45)); }
+
     function go(n) {
       slides[cur].classList.remove('active');
-      if (dots.length) dots[cur].classList.remove('active');
       cur = (n + slides.length) % slides.length;
       slides[cur].classList.add('active');
-      if (dots.length) dots[cur].classList.add('active');
-      reset();
+      if (counter) counter.textContent = (cur + 1) + ' / ' + slides.length;
+      schedule();
     }
-    function reset() {
-      if (slides.length < 2) return;
-      clearInterval(timer);
-      timer = setInterval(() => go(cur + 1), 6000);
+    function schedule() {
+      clearTimeout(timer);
+      if (slides.length < 2 || paused || userControlled) return;
+      timer = setTimeout(() => go(cur + 1), delayFor(cur));
     }
-    reset();
+    function pause() { paused = true; clearTimeout(timer); }
+    function resume() { paused = false; schedule(); }
+
+    // Pause while someone is reading (hover, focus or touch)
+    const section = track.closest('section') || track;
+    section.addEventListener('mouseenter', pause);
+    section.addEventListener('mouseleave', resume);
+    section.addEventListener('focusin', pause);
+    section.addEventListener('focusout', resume);
+
+    // Swipe left/right on phones
+    let startX = null;
+    track.addEventListener('touchstart', e => { startX = e.touches[0].clientX; pause(); }, { passive: true });
+    track.addEventListener('touchend', e => {
+      if (startX === null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      startX = null;
+      if (Math.abs(dx) > 40) { userControlled = true; go(cur + (dx < 0 ? 1 : -1)); }
+    }, { passive: true });
+
+    // Keyboard arrows when the carousel area has focus
+    section.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') { userControlled = true; go(cur + 1); }
+      if (e.key === 'ArrowLeft') { userControlled = true; go(cur - 1); }
+    });
+
+    if (counter) counter.textContent = '1 / ' + slides.length;
+    schedule();
   })();
 </script>
 
