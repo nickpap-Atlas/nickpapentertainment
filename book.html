@@ -1478,7 +1478,7 @@ function submitForm() {
   const eventSpecific = collectEventSpecific();
 
   const fields = {
-    _subject:             `Website Enquiry — Booking: ${selectedEventType} — ${clientName}`,
+    _subject:             `Website Enquiry #${Date.now().toString(36).slice(-5).toUpperCase()} — Booking: ${selectedEventType} — ${clientName}`,
     event_type:           selectedEventType,
     client_name:          clientName,
     email:                getVal('email'),
